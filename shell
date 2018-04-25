@@ -1,0 +1,59 @@
+#用法：sh exe-sql.sh 库名 用户名 密码 文件路径
+#!/usr/bin/env bash
+echo Start to install CRVanguard COD of linux ...
+
+LOGFILE=/tmp/mtstar-vanguard.log
+MTSTAR_HOME=/home/mtstar
+CRVanguard_FILE=$MTSTAR_HOME/vanguard/CRVanguard.sql
+
+user=mtstar
+group=mtstar
+
+rm -rf $LOGFILE
+touch $LOGFILE
+chmod 777 $LOGFILE
+
+chmod 777 $MTSTAR_HOME
+
+#create group if not exists
+egrep "^$group" /etc/group >& /dev/null
+if [ $? -ne 0 ]
+then
+    groupadd $group 1>>$LOGFILE
+fi
+
+#create user if not exists
+egrep "^$user" /etc/passwd >& /dev/null
+if [ $? -ne 0 ]
+then
+    adduser -g $group $user 1>>$LOGFILE
+fi
+
+#gzip CRVanguard cod
+echo Start to unzip, please wait ...
+tar xvfz ./CRVanguard.tar.gz -C $MTSTAR_HOME 1>>$LOGFILE
+
+#start mtstardb
+startMtstardb
+
+echo execute CRVanguard sql...
+export PGPASSWORD=66666666
+$MTSTAR_HOME/database/bin/psql -h 127.0.0.1 -p 5438 -U mtstar -d mtstar < $CRVanguard_FILE 1>>$LOGFILE
+echo CRVanguard sql end
+
+echo restart mtstar/mtstarweb...
+service mtstarweb restart
+service mtstartask restart
+echo end CRVanguard COD...
+
+function startMtstardb(){
+    count=`ps -ef |grep mtstardb |grep -v "grep" |wc -l`
+    if [ 0 = $count ];then
+        service mtstardb start
+        count1=`ps -ef |grep mtstardb |grep -v "grep" |wc -l`
+        if [ 0 = $count1 ]; then
+            echo mtstardb start failed...exit.
+            exit 1
+        fi
+    fi
+}
